@@ -1,0 +1,22 @@
+[project]
+name = "fiap-tech-challenge-fase-4"
+version = "0.1.0"
+description = "Tech challenge da fase 4 da pós tech em Engenharia de Machine Learning da FIAP"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+    "taskipy>=1.14.1",
+]
+
+[tool.taskipy.tasks]
+lint = "ruff check src/ tests/"
+lint-fix = "ruff check src/ tests/ --fix"
+
+[tool.ruff.lint]
+ignore = ["BLE001"]
