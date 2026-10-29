@@ -4,10 +4,14 @@ version = "0.1.0"
 description = "Tech challenge da fase 4 da pós tech em Engenharia de Machine Learning da FIAP"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pandas>=3.1.0",
+    "pandera>=0.35.0",
+]
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.4.0",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
