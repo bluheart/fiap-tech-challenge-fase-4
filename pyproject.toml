@@ -5,8 +5,11 @@ description = "Tech challenge da fase 4 da pós tech em Engenharia de Machine Le
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pandas>=3.1.0",
+    "evidently>=0.7.23",
+    "joblib>=1.6.0",
+    "pandas==2.2.3",
     "pandera>=0.35.0",
+    "scikit-learn>=1.9.1",
 ]
 
 [dependency-groups]
