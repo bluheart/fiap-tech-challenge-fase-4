@@ -1,6 +1,9 @@
+import json
 import os
 import sys
+import time
 from pathlib import Path
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -24,125 +27,163 @@ sys.path.insert(0, str(project_root))
 
 DATA_PATH = "data/reference/german_credit_data.csv"
 MODEL_PATH = "models/baseline_credit_model.joblib"
+LOG_PATH   = "logs/pipeline.jsonl"
+
+# ---------------------------------------------------------------------------
+# Helper de log no mesmo formato usado em validate_data.py
+# ---------------------------------------------------------------------------
+def log_event(step: str, status: str, **extra) -> None:
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    record = {"step": step, "status": status, **extra}
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
 
 # ---------------------------------------------------------------------------
 # 1. Load
 # ---------------------------------------------------------------------------
-df = pd.read_csv(DATA_PATH)
-df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
+t0 = time.perf_counter()
 
-if "target" not in df.columns:
-    raise ValueError("Reference dataset must contain 'target' (good/bad).")
+try:
+    df = pd.read_csv(DATA_PATH)
+    df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
 
-# ---------------------------------------------------------------------------
-# 2. Column groups
-# ---------------------------------------------------------------------------
-NUM_COLS = ["age", "credit_amount", "duration"]
+    if "target" not in df.columns:
+        raise ValueError("Reference dataset must contain 'target' (good/bad).")
 
-# Ordinal categoricals: order matters
-SAVINGS_ORDER  = ["none", "little", "moderate", "quite rich", "rich"]
-CHECKING_ORDER = ["none", "little", "moderate", "rich"]
-JOB_ORDER      = [0, 1, 2, 3]   # already numeric, kept as ordinal for clarity
+    log_event("train", "started", file=DATA_PATH, rows=len(df))
 
-ORDINAL_COLS = ["saving_accounts", "checking_account", "job"]
-ORDINAL_ORDERS = [SAVINGS_ORDER, CHECKING_ORDER, JOB_ORDER]
+    # -----------------------------------------------------------------------
+    # 2. Column groups
+    # -----------------------------------------------------------------------
+    NUM_COLS = ["age", "credit_amount", "duration"]
 
-# Nominal categoricals: no intrinsic order
-NOMINAL_COLS = ["sex", "housing", "purpose"]
+    SAVINGS_ORDER  = ["none", "little", "moderate", "quite rich", "rich"]
+    CHECKING_ORDER = ["none", "little", "moderate", "rich"]
+    JOB_ORDER      = [0, 1, 2, 3]
 
-# ---------------------------------------------------------------------------
-# 3. Clean the literal "NA" string -> "none" for ordinal columns
-#    (keeps ordinal encoder happy; "none" is the lowest level anyway)
-# ---------------------------------------------------------------------------
-for col in ["saving_accounts", "checking_account"]:
-    df[col] = df[col].astype(str).str.strip().replace({"NA": "none", "": "none"})
+    ORDINAL_COLS   = ["saving_accounts", "checking_account", "job"]
+    ORDINAL_ORDERS = [SAVINGS_ORDER, CHECKING_ORDER, JOB_ORDER]
+    NOMINAL_COLS   = ["sex", "housing", "purpose"]
 
-for col in NOMINAL_COLS:
-    df[col] = df[col].astype(str).str.strip()
+    # -----------------------------------------------------------------------
+    # 3. Cleaning
+    # -----------------------------------------------------------------------
+    for col in ["saving_accounts", "checking_account"]:
+        df[col] = df[col].astype(str).str.strip().replace({"NA": "none", "": "none"})
 
-for col in NUM_COLS:
-    df[col] = pd.to_numeric(df[col], errors="coerce")
+    for col in NOMINAL_COLS:
+        df[col] = df[col].astype(str).str.strip()
 
-# ---------------------------------------------------------------------------
-# 4. Encode target: good -> 0, bad -> 1
-# ---------------------------------------------------------------------------
-df["target"] = df["target"].astype(str).str.strip().map({"good": 0, "bad": 1})
-if df["target"].isna().any():
-    raise ValueError("Unexpected target values; expected 'good' or 'bad'.")
+    for col in NUM_COLS:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-df = df.dropna(subset=NUM_COLS + ORDINAL_COLS + NOMINAL_COLS + ["target"])
+    # -----------------------------------------------------------------------
+    # 4. Encode target
+    # -----------------------------------------------------------------------
+    df["target"] = df["target"].astype(str).str.strip().map({"good": 0, "bad": 1})
+    if df["target"].isna().any():
+        raise ValueError("Unexpected target values; expected 'good' or 'bad'.")
 
-# ---------------------------------------------------------------------------
-# 5. Train / test split
-# ---------------------------------------------------------------------------
-X = df[NUM_COLS + ORDINAL_COLS + NOMINAL_COLS]
-y = df["target"]
+    df = df.dropna(subset=NUM_COLS + ORDINAL_COLS + NOMINAL_COLS + ["target"])
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
-)
+    # -----------------------------------------------------------------------
+    # 5. Split
+    # -----------------------------------------------------------------------
+    X = df[NUM_COLS + ORDINAL_COLS + NOMINAL_COLS]
+    y = df["target"]
 
-# ---------------------------------------------------------------------------
-# 6. Preprocessing
-# ---------------------------------------------------------------------------
-numeric_pipe = Pipeline([("scaler", StandardScaler())])
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42, stratify=y
+    )
 
-# OrdinalEncoder: unknown values at inference -> NaN, then we can fall back.
-# Better: use handle_unknown='use_encoded_value' with unknown_value=-1
-ordinal_pipe = Pipeline([
-    ("ordinal", OrdinalEncoder(
-        categories=ORDINAL_ORDERS,
-        handle_unknown="use_encoded_value",
-        unknown_value=-1,
-    )),
-    ("scaler", StandardScaler()),
-])
+    # -----------------------------------------------------------------------
+    # 6. Preprocessing
+    # -----------------------------------------------------------------------
+    numeric_pipe = Pipeline([("scaler", StandardScaler())])
 
-nominal_pipe = Pipeline([
-    ("onehot", OneHotEncoder(
-        handle_unknown="ignore",
-        sparse_output=False,
-    )),
-])
+    ordinal_pipe = Pipeline([
+        ("ordinal", OrdinalEncoder(
+            categories=ORDINAL_ORDERS,
+            handle_unknown="use_encoded_value",
+            unknown_value=-1,
+        )),
+        ("scaler", StandardScaler()),
+    ])
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        ("num",     numeric_pipe,   NUM_COLS),
-        ("ordinal", ordinal_pipe,   ORDINAL_COLS),
-        ("nominal", nominal_pipe,   NOMINAL_COLS),
-    ],
-    remainder="drop",
-)
+    nominal_pipe = Pipeline([
+        ("onehot", OneHotEncoder(
+            handle_unknown="ignore",
+            sparse_output=False,
+        )),
+    ])
 
-# ---------------------------------------------------------------------------
-# 7. Model
-# ---------------------------------------------------------------------------
-model = Pipeline([
-    ("preprocessor", preprocessor),
-    ("classifier", LogisticRegression(
-        max_iter=2000,
-        class_weight="balanced",
-        solver="lbfgs",
-        random_state=42,
-    )),
-])
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num",     numeric_pipe,   NUM_COLS),
+            ("ordinal", ordinal_pipe,   ORDINAL_COLS),
+            ("nominal", nominal_pipe,   NOMINAL_COLS),
+        ],
+        remainder="drop",
+    )
 
-model.fit(X_train, y_train)
+    # -----------------------------------------------------------------------
+    # 7. Model
+    # -----------------------------------------------------------------------
+    model = Pipeline([
+        ("preprocessor", preprocessor),
+        ("classifier", LogisticRegression(
+            max_iter=2000,
+            class_weight="balanced",
+            solver="lbfgs",
+            random_state=42,
+        )),
+    ])
 
-# ---------------------------------------------------------------------------
-# 8. Evaluate
-# ---------------------------------------------------------------------------
-proba = model.predict_proba(X_test)[:, 1]
-pred  = model.predict(X_test)
+    model.fit(X_train, y_train)
 
-print(f"Test ROC-AUC : {roc_auc_score(y_test, proba):.4f}")
-print(f"Test PR-AUC  : {average_precision_score(y_test, proba):.4f}")
-print("\nClassification report:")
-print(classification_report(y_test, pred, digits=4))
+    # -----------------------------------------------------------------------
+    # 8. Evaluate
+    # -----------------------------------------------------------------------
+    proba = model.predict_proba(X_test)[:, 1]
+    pred  = model.predict(X_test)
 
-# ---------------------------------------------------------------------------
-# 9. Persist
-# ---------------------------------------------------------------------------
-os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-joblib.dump(model, MODEL_PATH)
-print(f"\nModel saved to: {MODEL_PATH}")
+    auc    = float(roc_auc_score(y_test, proba))
+    pr_auc = float(average_precision_score(y_test, proba))
+
+    print(f"Test ROC-AUC : {auc:.4f}")
+    print(f"Test PR-AUC  : {pr_auc:.4f}")
+    print("\nClassification report:")
+    print(classification_report(y_test, pred, digits=4))
+
+    # -----------------------------------------------------------------------
+    # 9. Persist
+    # -----------------------------------------------------------------------
+    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+    joblib.dump(model, MODEL_PATH)
+    print(f"\nModel saved to: {MODEL_PATH}")
+
+    # -----------------------------------------------------------------------
+    # 10. Log de sucesso (mesmo formato do validate_data.py)
+    # -----------------------------------------------------------------------
+    log_event(
+        "train",
+        "success",
+        file=DATA_PATH,
+        rows=len(df),
+        duration_s=round(time.perf_counter() - t0, 3),
+        auc=round(auc, 4),
+        pr_auc=round(pr_auc, 4),
+        model_path=MODEL_PATH,
+        errors=[],
+    )
+
+except Exception as exc:
+    log_event(
+        "train",
+        "failed",
+        file=DATA_PATH,
+        duration_s=round(time.perf_counter() - t0, 3),
+        errors=[f"{type(exc).__name__}: {exc}"],
+    )
+    raise

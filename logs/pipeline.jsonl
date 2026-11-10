@@ -6,3 +6,7 @@
 {"step": "data_validation", "file": "data/reference/german_credit_data.csv", "status": "success", "rows": 1000, "errors": []}
 {"step": "data_validation", "file": "data/reference/german_credit_data.csv", "status": "success", "rows": 1000, "errors": []}
 {"step": "data_validation", "file": "data/reference/german_credit_data.csv", "status": "success", "rows": 1000, "errors": []}
+{"step": "train", "status": "started", "file": "data/reference/german_credit_data.csv", "rows": 1000}
+{"step": "train", "status": "success", "file": "data/reference/german_credit_data.csv", "rows": 1000, "duration_s": 0.125, "auc": 0.6906, "pr_auc": 0.5046, "model_path": "models/baseline_credit_model.joblib", "errors": []}
+{"step": "drift_detection", "status": "started", "reference_file": "data/reference/german_credit_data.csv", "production_file": "data/production/credit_production.csv", "reference_rows": 1000, "production_rows": 1000}
+{"step": "drift_detection", "status": "success", "reference_file": "data/reference/german_credit_data.csv", "production_file": "data/production/credit_production.csv", "reference_rows": 1000, "production_rows": 1000, "duration_s": 0.904, "dataset_drift": true, "n_features_drifted": 7, "n_features_total": 9, "share_drifted": 0.7778, "features_drifted": ["age", "checking_account", "credit_amount", "duration", "housing", "purpose", "saving_accounts"], "report_html": "reports/drift_report.html", "metrics_json": "reports/metrics/drift_metrics.json", "errors": []}

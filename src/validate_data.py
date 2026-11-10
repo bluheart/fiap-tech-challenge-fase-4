@@ -9,6 +9,7 @@ sys.path.insert(0, str(project_root))
 
 from contracts.credit_schema import credit_schema
 
+output = "logs/pipeline.jsonl"
 
 def validate(path: str) -> int:
     df = pd.read_csv(path)
