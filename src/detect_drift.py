@@ -19,6 +19,7 @@ import time
 import warnings
 from pathlib import Path
 
+import mlflow
 import pandas as pd
 from evidently import Report
 from evidently.presets import DataDriftPreset
@@ -35,6 +36,8 @@ REPORT_HTML  = "reports/drift_report.html"
 METRICS_JSON = "reports/metrics/drift_metrics.json"
 LOG_PATH     = "logs/pipeline.jsonl"
 
+MLFLOW_EXPERIMENT = "credit-risk-baseline"
+MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 # ---------------------------------------------------------------------------
 # Helper de log no mesmo formato usado em validate_data.py / train_baseline.py
@@ -151,8 +154,8 @@ try:
     # -----------------------------------------------------------------------
     metrics = {
         "pipeline_status":       "success",
-        "reference_rows":        int(len(ref_eval)),
-        "production_rows":       int(len(prod_eval)),
+        "reference_rows":        len(ref_eval),
+        "production_rows":       len(prod_eval),
         "dataset_drift":         summary["dataset_drift"],
         "n_features_total":      len(feature_results),
         "n_features_drifted":    summary["number_of_drifted_columns"],
@@ -186,6 +189,17 @@ try:
         metrics_json=METRICS_JSON,
         errors=[],
     )
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
+
+    with mlflow.start_run(run_name="drift-detection"):
+        mlflow.log_metrics({
+            "n_features_drifted": summary["number_of_drifted_columns"],
+            "share_drifted":      summary["share_of_drifted_columns"],
+        })
+        mlflow.log_dict(metrics, "drift_metrics.json")
+        mlflow.log_artifact(REPORT_HTML)
 
     # -----------------------------------------------------------------------
     # 7. Resumo no console

@@ -5,7 +5,8 @@ import time
 from pathlib import Path
 
 import joblib
-import numpy as np
+import mlflow
+import mlflow.sklearn
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
@@ -25,9 +26,13 @@ from sklearn.preprocessing import (
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-DATA_PATH = "data/reference/german_credit_data.csv"
+DATA_PATH  = "data/reference/german_credit_data.csv"
 MODEL_PATH = "models/baseline_credit_model.joblib"
 LOG_PATH   = "logs/pipeline.jsonl"
+
+MLFLOW_EXPERIMENT = "credit-risk-baseline"
+MLFLOW_RUN_NAME   = "logreg-baseline"
+MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
 
 # ---------------------------------------------------------------------------
 # Helper de log no mesmo formato usado em validate_data.py
@@ -140,43 +145,75 @@ try:
         )),
     ])
 
-    model.fit(X_train, y_train)
+    # =======================================================================
+    # 7.1 Treino com MLflow (rastreamento do experimento)
+    # =======================================================================
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
-    # -----------------------------------------------------------------------
-    # 8. Evaluate
-    # -----------------------------------------------------------------------
-    proba = model.predict_proba(X_test)[:, 1]
-    pred  = model.predict(X_test)
+    with mlflow.start_run(run_name=MLFLOW_RUN_NAME) as run:
 
-    auc    = float(roc_auc_score(y_test, proba))
-    pr_auc = float(average_precision_score(y_test, proba))
+        # ---- Parâmetros do modelo (o que define o experimento) ----
+        mlflow.log_params({
+            "model_type":     "LogisticRegression",
+            "solver":         "lbfgs",
+            "max_iter":       2000,
+            "class_weight":   "balanced",
+            "random_state":   42,
+            "test_size":      0.25,
+            "n_train":        len(X_train),
+            "n_test":         len(X_test),
+            "n_features":     X.shape[1],
+        })
 
-    print(f"Test ROC-AUC : {auc:.4f}")
-    print(f"Test PR-AUC  : {pr_auc:.4f}")
-    print("\nClassification report:")
-    print(classification_report(y_test, pred, digits=4))
+        # ---- Treino ----
+        model.fit(X_train, y_train)
 
-    # -----------------------------------------------------------------------
-    # 9. Persist
-    # -----------------------------------------------------------------------
-    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    joblib.dump(model, MODEL_PATH)
-    print(f"\nModel saved to: {MODEL_PATH}")
+        # ---- Avaliação ----
+        proba = model.predict_proba(X_test)[:, 1]
+        pred  = model.predict(X_test)
 
-    # -----------------------------------------------------------------------
-    # 10. Log de sucesso (mesmo formato do validate_data.py)
-    # -----------------------------------------------------------------------
-    log_event(
-        "train",
-        "success",
-        file=DATA_PATH,
-        rows=len(df),
-        duration_s=round(time.perf_counter() - t0, 3),
-        auc=round(auc, 4),
-        pr_auc=round(pr_auc, 4),
-        model_path=MODEL_PATH,
-        errors=[],
-    )
+        auc    = float(roc_auc_score(y_test, proba))
+        pr_auc = float(average_precision_score(y_test, proba))
+
+        print(f"Test ROC-AUC : {auc:.4f}")
+        print(f"Test PR-AUC  : {pr_auc:.4f}")
+        print("\nClassification report:")
+        print(classification_report(y_test, pred, digits=4))
+
+        # ---- Métricas no MLflow ----
+        mlflow.log_metric("roc_auc", auc)
+        mlflow.log_metric("pr_auc",  pr_auc)
+
+        # ---- Persistência local + MLflow ----
+        os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+        joblib.dump(model, MODEL_PATH)
+        print(f"\nModel saved to: {MODEL_PATH}")
+
+        # Registra o modelo como artefato do run
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model",
+            registered_model_name="credit-risk-baseline",  # registry opcional
+        )
+
+        # Anexa o joblib também (útil para o script de drift reusar)
+        mlflow.log_artifact(MODEL_PATH, artifact_path="joblib")
+
+        # ---- Log de sucesso no JSONL (com run_id do MLflow) ----
+        log_event(
+            "train",
+            "success",
+            file=DATA_PATH,
+            rows=len(df),
+            duration_s=round(time.perf_counter() - t0, 3),
+            auc=round(auc, 4),
+            pr_auc=round(pr_auc, 4),
+            model_path=MODEL_PATH,
+            mlflow_run_id=run.info.run_id,
+            mlflow_experiment=MLFLOW_EXPERIMENT,
+            errors=[],
+        )
 
 except Exception as exc:
     log_event(

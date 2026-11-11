@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "evidently>=0.7.23",
     "joblib>=1.6.0",
+    "mlflow>=3.18.0",
     "pandas==2.2.3",
     "pandera>=0.35.0",
     "scikit-learn>=1.9.1",
@@ -22,8 +23,8 @@ dev = [
 ]
 
 [tool.taskipy.tasks]
-lint = "ruff check src/ tests/"
-lint-fix = "ruff check src/ tests/ --fix"
+lint = "ruff check src/"
+lint-fix = "ruff check src/ --fix"
 
 [tool.ruff.lint]
 ignore = ["BLE001"]

@@ -11,10 +11,11 @@ Output:
     data/production/credit_production.csv
 """
 
-import numpy as np
-import pandas as pd
 import sys
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -140,6 +141,7 @@ if ratio_violation.any():
 # 8. Save
 # ---------------------------------------------------------------------------
 import os
+
 os.makedirs(os.path.dirname(PRODUCTION_PATH), exist_ok=True)
 prod.to_csv(PRODUCTION_PATH, index=False)
 

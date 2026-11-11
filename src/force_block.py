@@ -1,13 +1,13 @@
-import pandas as pd
 import sys
 from pathlib import Path
+
+import pandas as pd
 import pandera.pandas as pa
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from contracts.credit_schema import credit_schema
-
 
 df = pd.read_csv("data/reference/german_credit_data.csv")
 credit_schema.validate(df)   # should pass
