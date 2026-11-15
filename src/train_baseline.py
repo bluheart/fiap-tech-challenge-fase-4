@@ -26,7 +26,7 @@ from sklearn.preprocessing import (
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-DATA_PATH  = "data/reference/german_credit_data.csv"
+DATA_PATH  = "data/reference/german_credit_data_5000.csv"
 MODEL_PATH = "models/baseline_credit_model.joblib"
 LOG_PATH   = "logs/pipeline.jsonl"
 
