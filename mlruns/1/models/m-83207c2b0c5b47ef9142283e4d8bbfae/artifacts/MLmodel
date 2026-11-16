@@ -1,0 +1,23 @@
+artifact_path: /workspaces/fiap-tech-challenge-fase-4/mlruns/1/models/m-83207c2b0c5b47ef9142283e4d8bbfae/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.skops
+    predict_fn: predict
+    python_version: 3.13.5
+  sklearn:
+    code: null
+    pickled_model: model.skops
+    serialization_format: skops
+    sklearn_version: 1.9.1
+    skops_trusted_types: null
+mlflow_version: 3.18.0
+model_id: m-83207c2b0c5b47ef9142283e4d8bbfae
+model_size_bytes: 230031
+model_uuid: m-83207c2b0c5b47ef9142283e4d8bbfae
+prompts: null
+run_id: 2d0b48c65710454c8f68e244ccedc965
+utc_time_created: '2026-11-11 00:00:10.589600'

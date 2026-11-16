@@ -1,0 +1,85 @@
+{
+  "pipeline_status": "success",
+  "reference_rows": 1000,
+  "production_rows": 1000,
+  "dataset_drift": true,
+  "n_features_total": 9,
+  "n_features_drifted": 7,
+  "share_drifted": 0.7778,
+  "drift_share_threshold": 0.5,
+  "features_drifted": [
+    "age",
+    "checking_account",
+    "credit_amount",
+    "duration",
+    "housing",
+    "purpose",
+    "saving_accounts"
+  ],
+  "feature_results": [
+    {
+      "feature": "age",
+      "method": "K-S p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "checking_account",
+      "method": "chi-square p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "credit_amount",
+      "method": "K-S p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "duration",
+      "method": "K-S p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "housing",
+      "method": "chi-square p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "purpose",
+      "method": "chi-square p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "saving_accounts",
+      "method": "chi-square p_value",
+      "drift_score": 0.0,
+      "threshold": 0.05,
+      "drift_detected": true
+    },
+    {
+      "feature": "job",
+      "method": "chi-square p_value",
+      "drift_score": 1.0,
+      "threshold": 0.05,
+      "drift_detected": false
+    },
+    {
+      "feature": "sex",
+      "method": "Z-test p_value",
+      "drift_score": 1.0,
+      "threshold": 0.05,
+      "drift_detected": false
+    }
+  ],
+  "evidently_report": "reports/drift_report.html"
+}
